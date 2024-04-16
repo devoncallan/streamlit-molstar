@@ -31,23 +31,31 @@ const MyFullScreen = (props: any) => {
 class MolstarComponent extends StreamlitComponentBase<State> {
   public render = (): ReactNode => {
     const height = this.props.args["height"]
+    const width = this.props.args["width"]
     const modelFile = this.props.args["modelFile"]
     const trajFile = this.props.args["trajFile"]
+    const preset_id = this.props.args["preset_id"]
+    const flag = this.props.args["flag"]
+    console.log("test:" + this.props.args["key"])
 
     if (modelFile && modelFile.data) {
       modelFile.data = this.props.args["modelFile_data"]
     }
     if (trajFile && trajFile.data) {
-      trajFile.data = this.props.args["trajFile_data"];
+      trajFile.data = this.props.args["trajFile_data"]
     }
     return (
-      <div style={{ height: height }}>
+      <div style={{ height: height, width: width }}>
         <MyFullScreen>
           <Molstar
             modelFile={modelFile}
             trajFile={trajFile}
             showExpand={false}
             showAnimation={true}
+            height={height}
+            width={width}
+            preset_id={preset_id}
+            flag={flag}
           />
         </MyFullScreen>
       </div>

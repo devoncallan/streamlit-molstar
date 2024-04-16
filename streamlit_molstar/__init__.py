@@ -1,6 +1,7 @@
 import os
 import streamlit.components.v1 as components
 from base64 import b64encode
+import streamlit as st
 
 # Create a _RELEASE constant. We'll set this to False while we're developing
 # the component, and True when we're ready to package and distribute it.
@@ -9,7 +10,7 @@ from base64 import b64encode
 _DEVELOP_MODE = os.getenv("DEVELOP_MODE")
 # _DEVELOP_MODE = True
 
-_RELEASE = not _DEVELOP_MODE
+_RELEASE = _DEVELOP_MODE
 
 # Declare a Streamlit component. `declare_component` returns a function
 # that is used to create instances of the component. We're naming this
@@ -80,7 +81,7 @@ def st_molstar(
         key=key,
     )
 
-
+# @st.cache_resource(experimental_allow_widgets=True)
 def st_molstar_content(
     file_content,
     file_format,
@@ -90,18 +91,26 @@ def st_molstar_content(
     file_name=None,
     traj_file_name=None,
     height="240px",
+    width="240px",
     key=None,
+    preset_id='preset-structure-representation-viewer-auto',
+    flag='false'
 ):
     params = {
+        "test": "xsomething!",
+        "flag": flag,
         "scene": "basic",
         "height": height,
+        "width": width,
         "modelFile": {
             "name": file_name or f"unknown.{file_format}",
             "data": "<placeholder>",  # FIXME as Python -> JavaScript encoding error, So put data parent Level
             "format": file_format,
         },
         "modelFile_data": file_content,
+        "preset_id": preset_id,
     }
+    # print(params)
     if traj_file_content:
         params["trajFile"] = {
             "name": traj_file_name or f"unknown.{traj_file_format}",
@@ -134,17 +143,17 @@ def st_molstar_remote(url, traj_url=None, height="240px", key=None):
 # Add some test code to play with the component while it's in development.
 # During development, we can run this just as we would any other Streamlit
 # app: `$ streamlit run molstar_component/__init__.py`
-if (not _RELEASE) or os.getenv("SHOW_MOLSTAR_DEMO"):
-    import streamlit as st
+# if (not _RELEASE) or os.getenv("SHOW_MOLSTAR_DEMO"):
+#     import streamlit as st
 
-    # st_molstar('examples/cluster_400.gro', key="li_test")
+#     # st_molstar('examples/cluster_400.gro', key="li_test")
 
-    # st_molstar_rcsb('1LOL', key='xx')
-    # st_molstar_remote("https://files.rcsb.org/view/1LOL.cif", key='sds')
-    # st_molstar('examples/complex.pdb', key='3')
-    # st_molstar('examples/cluster_of_100.gro', key='5')
-    # st_molstar('examples/md.gro',key='6')
-    # st_molstar('examples/H2O.cif',key='7')
-    st_molstar('../examples/complex.pdb', '../examples/complex.xtc', key='4')
-    st_molstar("../pchem/polyALA.pdb", "../pchem//polyALA_traj.dcd", key="10")
-    st_molstar_remote("http://localhost:8000/polyALA.pdb", "http://localhost:8000/polyALA_traj.dcd")
+#     # st_molstar_rcsb('1LOL', key='xx')
+#     # st_molstar_remote("https://files.rcsb.org/view/1LOL.cif", key='sds')
+#     # st_molstar('examples/complex.pdb', key='3')
+#     # st_molstar('examples/cluster_of_100.gro', key='5')
+#     # st_molstar('examples/md.gro',key='6')
+#     # st_molstar('examples/H2O.cif',key='7')
+#     st_molstar('../examples/complex.pdb', '../examples/complex.xtc', key='4')
+#     st_molstar("../pchem/polyALA.pdb", "../pchem//polyALA_traj.dcd", key="10")
+#     st_molstar_remote("http://localhost:8000/polyALA.pdb", "http://localhost:8000/polyALA_traj.dcd")

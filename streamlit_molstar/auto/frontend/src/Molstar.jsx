@@ -99,6 +99,7 @@ const Molstar = props => {
           } else if (category === "Topology") {
           }
         }
+        // await viewer.plugin.builders.structure.hierarchy.apply
     }
     init();
     return () => {
