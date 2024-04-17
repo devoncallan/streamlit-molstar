@@ -45,7 +45,6 @@ import { StructureSelectionManager } from "@dp-launching/molstar/lib/mol-plugin-
 // import { getSelectionFromChainAuthId } from
 
 const CustomMaterial = Material({ roughness: 0.2, metalness: 0 })
-
 const PresetParams = {
   ...StructureRepresentationPresetProvider.CommonParams,
 }
@@ -360,26 +359,15 @@ const Molstar = (props) => {
   }
 
   function getSelectionFromChainAuthId(chainId, positions) {
-    // const chainTestQuery = MS.core.rel.eq([
-    //   MS.struct.atomProperty.macromolecular.label_asym_id(),
-    //   chainId,
-    // ])
-    // const residueTestQuery = positions
-    //   ? MS.core.set.has([
-    //       MS.set(...positions),
-    //       MS.struct.atomProperty.macromolecular.auth_seq_id(),
-    //     ])
-    //   : undefined
-
     const query = MS.struct.generator.atomGroups({
       "chain-test": MS.core.rel.eq([
         MS.struct.atomProperty.macromolecular.label_asym_id(),
         chainId,
       ]),
-      // "residue-test": MS.core.set.has([
-      //   MS.set(...positions),
-      //   MS.struct.atomProperty.macromolecular.auth_seq_id(),
-      // ]),
+      "residue-test": MS.core.set.has([
+        MS.set(...positions),
+        MS.struct.atomProperty.macromolecular.auth_seq_id(),
+      ]),
       "group-by": MS.struct.atomProperty.macromolecular.residueKey(),
     })
     return Script.getStructureSelection(
@@ -466,17 +454,243 @@ const Molstar = (props) => {
         HotspotPreset
       )
 
+      // const params = {
+      // color: 'uncertainty',
+      // colorParams: {
+      //   value: 0.5,
+      //   domain: [2.5, 6],
+      //   list: {
+      //     colors: [
+      //       ColorNames.red,
+      //       ColorNames.white, // Yellow at the middle value
+      //       ColorNames.blue,
+      //     ],
+      //   }, // Blue at the highest value)
+      // }
+      // }
+      // let params = undefined
+      // plugin.current.dataTransaction(
+      //   async () => {
+      //     for (const c of components)
+      //       await a.updateRepresentationsTheme(c, { color: "uncertainty" })
+      //   },
+      //   { canUndo: "Update Theme" }
+      // )
+      // await a.updateRepresentationsTheme(components, { color: "uncertainty" })
+      // const update = plugin.current.build()
+      // const builder = plugin.current.builders.structure.representation
+      // console.log(components)
+      // const representations = {
+      //   polymer: builder.buildRepresentation(update, components.polymer, {
+      //     type: "gaussian-surface",
+      //     typeParams: { alpha: 1 },
+      //     color: "uncertainty",
+      //     colorParams: {
+      //       value: 0.5,
+      //       domain: [2.5, 6],
+      //       list: {
+      //         colors: [
+      //           ColorNames.red,
+      //           ColorNames.white, // Yellow at the middle value
+      //           ColorNames.blue,
+      //         ],
+      //       }, // Blue at the highest value
+      //     },
+      //   }),
+      // }
+      // await update.commit({ revertOnError: true })
+      const repr = structures[0]
+      // console.log(repr.cell)
+      // console.log(await plugin.current.build().to(repr.cell))
+      // console.log(
+      //   await plugin.current
+      //     .build()
+      //     .to(repr.cell)
+      //     .update(
+      //       createStructureRepresentationParams(plugin.current, repr.cell, {
+      //         type: "ball-and-stick",
+      //         typeParams: { aromaticBonds: true },
+      //       })
+      //     )
+      //     // .commit()
+      // )
+      // await plugin.current
+      //   .build()
+      //   .to(repr.cell)
+      //   .update(
+      //     createStructureRepresentationParams(plugin.current, repr.cell, {
+      //       type: "ball-and-stick",
+      //       typeParams: { aromaticBonds: true },
+      //     })
+      //   )
+      //   .commit()
+      // createStructureRepresentationParams(plugin.current, void 0, {})
+      // plugin.current.managers.interactivity.setProps({ granularity: "element" })
+
+      // plugin.current.dataTransaction(
+      //   async () => {
+      //     await plugin.current
+      //       .build()
+      //       .to(repr.cell)
+      //       .update(prev => {
+      //         prev.params = createStructureRepresentationParams(
+      //           plugin.current,
+      //           repr,
+      //           {
+      //             type: "ball-and-stick",
+      //             typeParams: { aromaticBonds: true },
+      //           }
+      //         )
+      //       })
+      //       .commit()
+      // for (const s of plugin.current.managers.structure.hierarchy.selection
+      //   .structures)
+      // await a.addRepresentation(components, "ligand")
+      // await a.updateRepresentationsTheme(components, {
+      //   // type: "gaussian-surface",
+      //   // typeParams: { alpha: 1 },
+      //   color: "uncertainty",
+      //   colorParams: {
+      //     value: 0.5,
+      //     domain: [2.5, 6],
+      //     list: {
+      //       colors: [
+      //         ColorNames.red,
+      //         ColorNames.white, // Yellow at the middle value
+      //         ColorNames.blue,
+      //       ],
+      //     }, // Blue at the highest value)
+      //   },
+      // })
+
+      // const query = compileIdListSelection("D 306-311", "auth")
+      // plugin.current.managers.structure.selection.fromCompiledQuery(
+      //   "add",
+      //   query
+      // )
+      // console.log(plugin.current.managers.structure.selection.getSnapshot())
+
+      // console.log(
+      //   plugin.current.managers.structure.selection.fromSelectionQuery(
+      //     "set",
+      //     query
+      //   )
+      // )
+      console.log("yooo!")
+      console.log(structures[0])
+      const s = structures[0]
+      // const s = Structure(structures[0])
+      console.log(s)
+      // console.log(structures[0])
+      const Q = MolScriptBuilder
+      // var sel = Script.getStructureSelection(
+      //   (Q) =>
+      //     Q.struct.generator.atomGroups({
+      //       "chain-test": Q.core.rel.eq([
+      //         Q.struct.atomProperty.macromolecular.auth_asym_id(),
+      //         "A",
+      //       ]),
+      //       "residue-test": Q.core.rel.eq([
+      //         Q.struct.atomProperty.macromolecular.label_seq_id(),
+      //         306,
+      //       ]),
+      //     }),
+      //   s
+      // )
+      // console.log(sel)
+
+      // let loci = StructureSelection.toLociWithSourceUnits(sel)
+
+      const query2 = compileIdListSelection("A 306-311", "auth")
+      // const b2 = plugin.current.managers.structure.selection.fromCompiledQuery(
+      //   "add",
+      //   query
+      // )
+
+      // console.log(plugin.current.managers.structure.hierarchy)
+
+      // const ligandData =
+      //   plugin.current.managers.structure.hierarchy.selection.structures[0]
+      //     ?.components[0]?.cell.obj?.data
+
+      // const selection = StructureSelection.toLociWithCurrentUnits(
+      //   Script.getStructureSelection("C 306-311", structures[0])
+      // )
+      // console.log(selection)
+      // console.log(ligandData)
+
+      // const ligandLoci = Structure.toStructureElementLoci(ligandData)
+
+      // plugin.current.managers.camera.focusLoci(ligandLoci)
+      // plugin.current.managers.interactivity.lociSelects.select({
+      //   loci: ligandLoci,
+      // })
+
+      // console.log(
+      //   plugin.current.managers.structure.hierarchy.selection.structures.current
+      // )
+      console.log("hello!")
+
+      // getSelectionFromChainAuthId()
+
+      // const selection = Script.getStructureSelection(
+      //   (Q) =>
+      //     Q.struct.generator.atomGroups({
+      //       "chain-test": Q.core.rel.eq([Q.ammp("label_asym_id"), "C"]),
+      //       "residue-test": Q.core.rel.eq([Q.ammp("label_seq_id"), xx]),
+      //     }),
+      //   // plugin.current.managers.structure.hierarchy.selection.structures
+      //   structures[0]?.components[0]?.cell.obj?.data
+      // )
+      // console.log(selection)
       const selection = getSelectionFromChainAuthId(
-        "C"
-        // [306, 307, 308, 309, 310, 311]
+        "C",
+        [306, 307, 308, 309, 310, 311]
       )
+
       const loci = StructureSelection.toLociWithSourceUnits(selection)
       console.log("dsakjflaksdj")
       console.log(loci)
 
+      // plugin.current.managers.camera.focusLoci(loci)
+      console.log(plugin.current.managers.interactivity)
+      // plugin.current.managers.interactivity.lociHighlights.highlightOnly({ loci })
       plugin.current.managers.interactivity.lociSelects.select({
         loci: loci,
       })
+      // await plugin.current.canvas3d?.setProps({
+      //   // color: ColorNames.red,
+      //   camera: {
+      //     helper: {
+      //       axes: {
+      //         name: "off",
+      //         params: {},
+      //       },
+      //     },
+      //   },
+      //   // backgroundColor: ColorNames.pink, // or: 0xff0000 as Color
+      // })
+      //   },
+      //   { canUndo: "Update Theme" }
+      // )
+      // plugin.current.state.data
+      //   .build()
+      //   .to(repr.cell)
+      //   .update(
+      //     createStructureRepresentationParams(
+      //       plugin.current,
+      //       components[0].cell.obj?.data,
+      //       {
+      //         type: "ball-and-stick",
+      //         typeParams: { aromaticBonds: true },
+      //       }
+      //     )
+      //   )
+      //   .commit()
+
+      // console.log(a.currentStructures)
+      // console.log(refs)
+      // console.log(hierarchy.)
     }
 
     async function test() {
@@ -508,34 +722,12 @@ const Molstar = (props) => {
       const trackball = plugin.current.canvas3d.props.trackball
       PluginCommands.Canvas3D.SetSettings(plugin.current, {
         settings: {
-          sceneRadiusFactor: 10,
-          marking: {
-            selectEdgeColor: ColorNames.black,
-            selectEdgeStrength: 10,
-          },
-          renderer: {
-            backgroundColor: ColorNames.white,
-            selectColor: ColorNames.white,
-          },
-
           trackball: {
             ...trackball,
-            noScroll: false,
-            rotateSpeed: 2,
-            zoomSpeed: 0.2,
-            panSpeed: 0.8,
-            spin: true,
-            spinSpeed: 1,
-            staticMoving: false,
-            dynamicDampingFactor: 0.06,
-            minDistance: 0.01,
-            maxDistance: 1e150,
-            // gestureScaleFactor: 0.01,
-
-            //   animate:
-            //     trackball.animate.name === "spin"
-            //       ? { name: "off", params: {} }
-            //       : { name: "spin", params: { speed: 5 } },
+            animate:
+              trackball.animate.name === "spin"
+                ? { name: "off", params: {} }
+                : { name: "spin", params: { speed: 1 } },
           },
         },
       })
@@ -546,7 +738,261 @@ const Molstar = (props) => {
     } else {
       test()
     }
+    // test()
+    // const disposePlugin = () => {
+    //   if (plugin.current) {
+    //     plugin.current.dispose()
+    //     plugin.current = null
+    //   }
+    // }
+    // return disposePlugin
+    // return
   }, [flag])
+
+  // useEffect(() => {
+
+  // })
+
+  // useEffect(() => {
+  //   console.log('Model or trajectory file changed.')
+  //   console.log(trajFile)
+  //   console.log(modelFile)
+  //   loadStructure(modelFile, trajFile, plugin.current)
+  // }, [modelFile, trajFile])
+
+  // useEffect(() => {
+  //   if (plugin.current) {
+  //     if (!showAxes) {
+  //       // eslint-disable-next-line
+  //       plugin.current.canvas3d?.setProps({
+  //         camera: {
+  //           helper: {
+  //             axes: {
+  //               name: "off",
+  //               params: {},
+  //             },
+  //           },
+  //         },
+  //       })
+  //     } else {
+  //       // eslint-disable-next-line
+  //       plugin.current.canvas3d?.setProps({
+  //         camera: {
+  //           helper: {
+  //             axes: ParamDefinition.getDefaultValues(CameraHelperParams).axes,
+  //           },
+  //         },
+  //       })
+  //     }
+  //   }
+  // }, [showAxes])
+
+  // useEffect(() => {
+  //   async function update() {
+  //     console.log(flag)
+  //     console.log('hello~')
+  //     // const update = plugin.build()
+  //     // const builder = plugin.builders.structure.representation
+  //     // const representations = {
+  //     //   polymer: builder.buildRepresentation(update, components.polymer, {
+  //     //     type: "gaussian-surface",
+  //     //     typeParams: { alpha: 1 },
+  //     //     color: "uncertainty",
+  //     //     colorParams: {
+  //     //       value: 0.5,
+  //     //       domain: [2.5, 6],
+  //     //       list: {
+  //     //         colors: [
+  //     //           ColorNames.red,
+  //     //           ColorNames.white, // Yellow at the middle value
+  //     //           ColorNames.blue,
+  //     //         ],
+  //     //       }, // Blue at the highest value
+  //     //     },
+  //     //   }),
+  //     // }
+  //     // await update.commit({ revertOnError: true })
+  //     // plugin.managers.interactivity.setProps({ granularity: "element" })
+  //   }
+  //   update()
+  //   const disposePlugin = () => {
+  //     if (plugin.current) {
+  //       plugin.current.dispose()
+  //       plugin.current = null
+  //     }
+  //   }
+  //   return disposePlugin
+  // }, [flag])
+
+  // async function get_current() {
+  //   if (plugin & plugin.current) {
+  //     const current = await plugin.current.managers.structure.hierarchy.current
+  //     return current
+  //   }
+  //   return
+  // }
+
+  // useEffect(() => {
+  //   async function update() {
+  //     if (plugin && plugin.current) {
+  //       console.log("update!")
+  //       console.log(flag)
+  //       const update = plugin.current.build()
+  //       const builder = plugin.current.builders.structure.representation
+
+  //       const renderer = plugin.current.canvas3d?.props.renderer
+  //       if (renderer) {
+  //         PluginCommands.Canvas3D.SetSettings(plugin.current, {
+  //           settings: {
+  //             renderer: {
+  //               ...renderer,
+  //               backgroundColor: ColorNames.pink, // or: 0xff0000 as Color
+  //             },
+  //           },
+  //         })
+  //       }
+  //       console.log(renderer)
+
+  //       // console.log("structure")
+  //       console.log("current plugin:", plugin.current)
+  //       console.log("plugin.build():", plugin.current.build())
+
+  //       const curr = await plugin.current.managers.structure.hierarchy.current
+  //       console.log("xfdsfa sd", curr)
+
+  //       const reprs = curr.structures
+  //       const trajs = curr.trajectories
+  //       const models = curr.models
+  //       const refs = curr.refs
+  //       // const
+  //       console.log("reprs:", reprs)
+  //       console.log("trajs: ", trajs)
+
+  //       console.log("refs:", refs)
+
+  //       console.log('test:', await plugin.current.managers.structure)
+
+  //       // const structureCell = StateObjectRef.resolveAndCheck(
+  //       //   plugin.current.state.data,
+  //       //   // plugin.current
+  //       //   undefined
+  //       // )
+  //       // console.log(structureCell)
+  //       // const update = plugin.current.build()
+
+  //       // get list of all structures
+
+  //       // const reprs = await plugin.current.managers.structure.hierarchy.current
+  //       //   .structures
+  //       // const hierarchy = await plugin.current.managers.structure.hierarchy.updateStructure(reprs[0])
+  //       // console.log(hierarchy)
+
+  //       const repr = reprs[0]
+  //       console.log(repr.cell)
+  //       await plugin.current
+  //         .build()
+  //         .to(repr.cell)
+  //         .update(
+  //           // StateTransforms.Representation.StructureRepresentation3D,
+  //           // (old) => {
+  //           //   old.type.params.aromaticBonds = true
+  //           // }
+  //           createStructureRepresentationParams(plugin.current, void 0, {
+  //             type: "ball-and-stick",
+  //             typeParams: { aromaticBonds: true },
+  //           })
+  //         ).commit()
+
+  //       // const a = await plugin.current.managers
+  //       // console.log(a)
+
+  //       // console.log("...")
+  //       // console.log(reprs)
+  //       // for (const repr of reprs) {
+  //       //   console.log(repr)
+  //       //   console.log(update)
+  //       //   console.log(repr.cell)
+  //       //   console.log(update.to(repr.cell))
+
+  //       //   const components = {
+  //       //     polymer: await presetStaticComponent(
+  //       //       plugin.current,
+  //       //       repr.cell,
+  //       //       "polymer"
+  //       //     ),
+  //       //   }
+  //       //   // const components = {
+  //       //   //   polymer: undefined
+  //       //   // }
+  //       //   // const update = plugin.build()
+  //       //   // const builder = plugin.current.builders.structure.representation
+  //       //   console.log(flag)
+  //       //   console.log(flag ? "gaussian-surface" : "ball-and-stick")
+  //       //   // plugin.current.clear()
+  //       //   const representations = {
+  //       //     polymer: await builder.buildRepresentation(
+  //       //       update,
+  //       //       components.polymer,
+  //       //       {
+  //       //         type: flag ? "gaussian-surface" : "ball-and-stick",
+  //       //         typeParams: { alpha: 1 },
+  //       //         color: "uncertainty",
+  //       //         colorParams: {
+  //       //           value: 0.5,
+  //       //           domain: [2.5, 6],
+  //       //           list: {
+  //       //             colors: [
+  //       //               ColorNames.red,
+  //       //               ColorNames.white, // Yellow at the middle value
+  //       //               ColorNames.blue,
+  //       //             ],
+  //       //           }, // Blue at the highest value
+  //       //         },
+  //       //       }
+  //       //     ),
+  //       //   }
+
+  //       //   // plugin.current.clear()
+  //       //   await update.commit({ revertOnError: true })
+
+  //       //   console.log("hello?")
+  //       // }
+  //       // console.log(
+  //       //   plugin.current
+  //       //     .build()
+
+  //       // )
+  //       // console.log(structure)
+
+  //       // const renderer = plugin.current.canvas3d!.props.renderer;
+  //       // PluginCommands.Canvas3D.SetSettings(plugin.current, { settings: { renderer: { ...renderer, backgroundColor: ColorNames.red /* or: 0xff0000 as Color */ } } });
+  //       // await canvasRef.applySettings({ color: ColorNames.blue })
+  //       // const components = {
+  //       //   ligand: await presetStaticComponent(plugin, structureCell, "all"),
+  //       //   interactions: await presetStaticComponent(
+  //       //     plugin,
+  //       //     structureCell,
+  //       //     "all"
+  //       //   ),
+  //       // }
+
+  //       // const representations = {
+  //       //   polymer: builder.buildRepresentation(update, components.polymer, )
+  //       // }
+  //       // console.log(update)
+  //       // console.log(builder)
+  //       // console.log(components)
+  //     }
+  //   }
+  //   update()
+  //   // const disposePlugin = () => {
+  //   //   if (plugin.current) {
+  //   //     plugin.current.dispose()
+  //   //     plugin.current = null
+  //   //   }
+  //   // }
+  //   // return disposePlugin
+  // }, [flag])
 
   const loadStructure = async (modelFile, trajFile, _plugin) => {
     if (_plugin) {
