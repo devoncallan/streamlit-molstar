@@ -36,6 +36,10 @@ class MolstarComponent extends StreamlitComponentBase<State> {
     const trajFile = this.props.args["trajFile"]
     const preset_id = this.props.args["preset_id"]
     const flag = this.props.args["flag"]
+
+    const molscriptSelectionResidues =
+      this.props.args["molscriptSelectionResidues"]
+    const molscriptSelectionChains = this.props.args["molscriptSelectionChains"]
     console.log("test:" + this.props.args["key"])
 
     if (modelFile && modelFile.data) {
@@ -45,8 +49,8 @@ class MolstarComponent extends StreamlitComponentBase<State> {
       trajFile.data = this.props.args["trajFile_data"]
     }
     return (
-      <div style={{ height: height, width: width }}>
-        <MyFullScreen>
+      <div style={{ height: height, width: width, border: "0px" }}>
+        {/* <MyFullScreen> */}
           <Molstar
             modelFile={modelFile}
             trajFile={trajFile}
@@ -56,8 +60,10 @@ class MolstarComponent extends StreamlitComponentBase<State> {
             width={width}
             preset_id={preset_id}
             flag={flag}
+            molscriptSelectionResidues={molscriptSelectionResidues}
+            molscriptSelectionChains={molscriptSelectionChains}
           />
-        </MyFullScreen>
+        {/* </MyFullScreen> */}
       </div>
     )
   }

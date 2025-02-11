@@ -22,7 +22,13 @@ import {
   StateObjectRef,
   StateSelection,
 } from "@dp-launching/molstar/lib/mol-state"
-import { presetStaticComponent } from "@dp-launching/molstar/lib/mol-plugin-state/builder/structure/representation-preset"
+import {
+  presetStaticComponent,
+  presetSelectionComponent,
+} from "@dp-launching/molstar/lib/mol-plugin-state/builder/structure/representation-preset"
+
+import { StructureSelectionQuery } from "@dp-launching/molstar/lib/mol-plugin-state/helpers/structure-selection-query"
+
 import { PluginCommands } from "@dp-launching/molstar/lib/mol-plugin/commands"
 import { StructureFromModel } from "@dp-launching/molstar/lib/mol-plugin-state/transforms/model"
 import { Material } from "@dp-launching/molstar/lib/mol-util/material"
@@ -40,14 +46,66 @@ import {
   MolScriptBuilder,
 } from "@dp-launching/molstar/lib/mol-script/language/builder"
 
-import { StructureSelectionManager } from "@dp-launching/molstar/lib/mol-plugin-state/manager/structure/selection"
+import {
+  changeCameraRotation,
+  ROTATION_MATRICES,
+} from "@dp-launching/molstar/lib/mol-plugin-state/manager/focus-camera/orient-axes"
+
+import { Mat3 } from "@dp-launching/molstar/lib/mol-math/linear-algebra/3d/mat3"
+
+import { rotateBy, rotateX, rotateY, rotateZ } from "./CameraHelper"
+// import { StructureSelectionManager } from "@dp-launching/molstar/lib/mol-plugin-state/manager/structure/selection"
+// import { Color } from "@dp-launching/molstar/lib/mol-util/color/color"
 
 // import { getSelectionFromChainAuthId } from
 
-const CustomMaterial = Material({ roughness: 0.2, metalness: 0 })
+const defaultColor = ColorNames.white
+const hotspotColor = 0x09847a
+const secondaryColor = 0x003660
+
+const CustomMaterial = Material({ roughness: 1, metalness: 0 })
 
 const PresetParams = {
   ...StructureRepresentationPresetProvider.CommonParams,
+}
+
+const DefaultSurfaceParams = {
+  type: "gaussian-surface",
+  typeParams: { alpha: 1, material: CustomMaterial, sizeFactor: 1 },
+  color: "uniform",
+  colorParams: { value: defaultColor },
+}
+const DefaultCartoonParams = {
+  type: "cartoon",
+  typeParams: { alpha: 1, sizeFactor: 0.2 },
+  color: "secondary_structure",
+}
+
+const DefaultViewerParams = {}
+
+const HotspotSurfaceParams = {
+  type: "gaussian-surface",
+  typeParams: {
+    quality: "Highest",
+    alpha: 1,
+    material: CustomMaterial,
+    sizeFactor: 1,
+  },
+  color: "uncertainty",
+  colorParams: {
+    domain: [2.5, 6],
+    list: {
+      colors: [defaultColor, defaultColor, hotspotColor],
+    },
+  },
+}
+
+const BinderCartoonParams = {
+  type: "cartoon",
+  color: "sequence-id",
+  // colorParams: {
+  //   value: ColorNames.cornflowerblue,
+  // },
 }
 
 function get_url_from_data(data, isBinary) {
@@ -58,6 +116,56 @@ function get_url_from_data(data, isBinary) {
     blob = new Blob([data], { type: "text/plain" })
   }
   return URL.createObjectURL(blob)
+}
+
+function getSelectionQueryFromMolscript(chainId, positions) {
+  const chainTestQuery =
+    chainId !== ""
+      ? MS.core.rel.eq([
+          MS.struct.atomProperty.macromolecular.label_asym_id(),
+          chainId,
+        ])
+      : undefined
+  const residueTestQuery =
+    positions && positions.length !== 0
+      ? MS.core.set.has([
+          MS.set(...positions),
+          MS.struct.atomProperty.macromolecular.auth_seq_id(),
+        ])
+      : undefined
+
+  if (!chainTestQuery && !residueTestQuery) {
+    return undefined
+  }
+
+  let atomGroups = {}
+  if (chainTestQuery) {
+    atomGroups["chain-test"] = chainTestQuery
+  }
+  if (residueTestQuery) {
+    atomGroups["residue-test"] = residueTestQuery
+  }
+  atomGroups["group-by"] = MS.struct.atomProperty.macromolecular.residueKey()
+  const query = MS.struct.generator.atomGroups(atomGroups)
+  return query
+}
+
+function inverseSelection(partialStructureExpression, fullStructureExpression) {
+  return MS.struct.modifier.union([
+    MS.struct.modifier.exceptBy({
+      0: fullStructureExpression,
+      by: partialStructureExpression,
+    }),
+  ])
+}
+
+function getSubstructure(structureCell, query) {
+  console.log("getSubstructure of : ", structureCell)
+  if (!structureCell) {
+    return structureCell
+  }
+
+  return Script.getStructureSelection(query, structureCell.obj?.data)
 }
 
 export const addTrajectory = async (plugin, params) => {
@@ -138,152 +246,150 @@ export const addTrajectory = async (plugin, params) => {
   const structure = await plugin.builders.structure.createStructure(trajectory)
   await plugin.builders.structure.representation.applyPreset(structure, "auto")
 }
-
-const InteractionsPreset = StructureRepresentationPresetProvider({
-  id: "preset-interactions",
-  display: { name: "Interactions" },
-  params: () => PresetParams,
-  async apply(ref, params, plugin) {
-    const structureCell = StateObjectRef.resolveAndCheck(plugin.state.data, ref)
-    const structure = structureCell?.obj?.data
-    if (!structureCell || !structure) return {}
-
-    const components = {
-      ligand: await presetStaticComponent(plugin, structureCell, "all"),
-      interactions: await presetStaticComponent(plugin, structureCell, "all"),
-    }
-
-    const { update, builder, typeParams } =
-      StructureRepresentationPresetProvider.reprBuilder(plugin, params)
-    const representations = {
-      ligand: builder.buildRepresentation(
-        update,
-        components.ligand,
-        {
-          type: "ball-and-stick",
-          typeParams: {
-            ...typeParams,
-            material: CustomMaterial,
-            sizeFactor: 0.3,
-          },
-          color: "element-symbol",
-          colorParams: { carbonColor: { name: "element-symbol", params: {} } },
-        },
-        { tag: "all" }
-      ),
-    }
-
-    await update.commit({ revertOnError: true })
-    plugin.managers.interactivity.setProps({ granularity: "element" })
-
-    return { components, representations }
-  },
-})
-
-const HotspotPreset = StructureRepresentationPresetProvider({
-  id: "hotspot-preset",
-  display: { name: "Hotspots" },
-  params: () => PresetParams,
-  async apply(ref, params, plugin) {
-    const structureCell = StateObjectRef.resolveAndCheck(plugin.state.data, ref)
-    const structure = structureCell?.obj?.data
-    if (!structureCell || !structure) return {}
-
-    const components = {
-      ligand: await presetStaticComponent(plugin, structureCell, "all"),
-      // interactions: await presetStaticComponent(plugin, structureCell, "all"),
-    }
-
-    const { update, builder, typeParams } =
-      StructureRepresentationPresetProvider.reprBuilder(plugin, params)
-    const representations = {
-      ligand: builder.buildRepresentation(
-        update,
-        components.ligand,
-        {
-          type: "gaussian-surface",
-          typeParams: { alpha: 1 },
-          color: "uncertainty",
-          colorParams: {
-            value: 0.5,
-            domain: [2.5, 6],
-            list: {
-              colors: [
-                ColorNames.red,
-                ColorNames.white, // Yellow at the middle value
-                ColorNames.blue,
-              ],
-            }, // Blue at the highest value
-          },
-          // typeParams: {
-          //   ...typeParams,
-          //   material: CustomMaterial,
-          //   sizeFactor: 0.3,
-          // },
-          // color: "uncertainty",
-          // colorParams: { carbonColor: { name: "element-symbol", params: {} } },
-        },
-        { tag: "all" }
-      ),
-    }
-
-    await update.commit({ revertOnError: true })
-    plugin.managers.interactivity.setProps({ granularity: "element" })
-
-    return { components, representations }
-  },
-})
-
-const ViewerAutoPreset = StructureRepresentationPresetProvider({
-  id: "preset-structure-representation-viewer-auto",
-  display: {
-    name: "Automatic (w/ Annotation)",
-    group: "Annotation",
-    description:
-      "Show standard automatic representation but colored by quality assessment (if available in the model).",
-  },
-  isApplicable(a) {
-    return (
-      !!a.data.models.some((m) => QualityAssessment.isApplicable(m, "pLDDT")) ||
-      !!a.data.models.some((m) => QualityAssessment.isApplicable(m, "qmean"))
-    )
-  },
-  params: () => StructureRepresentationPresetProvider.CommonParams,
-  async apply(ref, params, plugin) {
-    const structureCell = StateObjectRef.resolveAndCheck(plugin.state.data, ref)
-    const structure =
-      structureCell && structureCell.obj && structureCell.obj.data
-    const nmodels = structure.state.models[0].sourceData.data.structures
-      ? structure.state.models[0].sourceData.data.structures.length
-      : structure.state.models[0].modelNum
-    if (nmodels > 1) {
-      plugin.config.set("viewer.show-animation-button", true)
-    } else {
-      plugin.config.set("viewer.show-animation-button", false)
-      plugin.managers.animation._animations.length = []
-    }
-
-    if (!structureCell || !structure) return {}
-
-    if (structure.model.sourceData.kind === "gro") {
-      return await InteractionsPreset.apply(ref, params, plugin)
-    } else if (
-      structure.models.some((m) => QualityAssessment.isApplicable(m, "pLDDT"))
-    ) {
-      return await QualityAssessmentPLDDTPreset.apply(ref, params, plugin)
-    } else if (
-      structure.models.some((m) => QualityAssessment.isApplicable(m, "qmean"))
-    ) {
-      return await QualityAssessmentQmeanPreset.apply(ref, params, plugin)
-    } else {
-      return await PresetStructureRepresentations.auto.apply(
-        ref,
-        params,
-        plugin
+const DefaultGaussianRepresentationPreset =
+  StructureRepresentationPresetProvider({
+    id: "default-gaussian-preset",
+    display: { name: "Default" },
+    params: () => PresetParams,
+    async apply(ref, params, plugin) {
+      const structureCell = StateObjectRef.resolveAndCheck(
+        plugin.state.data,
+        ref
       )
-    }
-  },
-})
+      const structure = structureCell?.obj?.data
+      if (!structureCell || !structure) return {}
+
+      const components = {
+        ligand: await presetStaticComponent(plugin, structureCell, "all"),
+      }
+
+      const { update, builder, typeParams } =
+        StructureRepresentationPresetProvider.reprBuilder(plugin, params)
+      const representations = {
+        ligand: builder.buildRepresentation(
+          update,
+          components.ligand,
+          DefaultSurfaceParams
+        ),
+      }
+      await update.commit({ revertOnError: true })
+      plugin.managers.interactivity.setProps({ granularity: "element" })
+
+      return { components, representations }
+    },
+  })
+
+const DefaultHotspotRepresentationPreset =
+  StructureRepresentationPresetProvider({
+    id: "default-hotspot-preset",
+    display: { name: "Hotspot" },
+    params: () => PresetParams,
+    async apply(ref, params, plugin) {
+      const structureCell = StateObjectRef.resolveAndCheck(
+        plugin.state.data,
+        ref
+      )
+      const structure = structureCell?.obj?.data
+      if (!structureCell || !structure) return {}
+
+      const components = {
+        ligand: await presetStaticComponent(plugin, structureCell, "all"),
+        polymer: await presetStaticComponent(plugin, structureCell, "polymer"),
+      }
+
+      const { update, builder, typeParams } =
+        StructureRepresentationPresetProvider.reprBuilder(plugin, params)
+      const representations = {
+        ligand: builder.buildRepresentation(
+          update,
+          components.ligand,
+          HotspotSurfaceParams
+        ),
+      }
+      await update.commit({ revertOnError: true })
+      plugin.managers.interactivity.setProps({ granularity: "element" })
+
+      return { components, representations }
+    },
+  })
+
+const DefaultBinderRepresentationPreset = StructureRepresentationPresetProvider(
+  {
+    id: "default-binders-preset",
+    display: { name: "Binders" },
+    params: () => PresetParams,
+    async apply(ref, params, plugin) {
+      console.log("Applying preset: ", "default-binders-preset")
+      const structureCell = StateObjectRef.resolveAndCheck(
+        plugin.state.data,
+        ref
+      )
+      const structure = structureCell?.obj?.data
+      if (!structureCell || !structure) return {}
+
+      // SELECTION CODE GOES HERE
+      const binderTag = "binderTag"
+      const targetTag = "targetTag"
+
+      // Create Structure Expressions
+      const fullStructureExpression = MS.struct.generator.all()
+      const binderExpression = getSelectionQueryFromMolscript("N")
+      const targetProteinExpression = inverseSelection(
+        binderExpression,
+        fullStructureExpression
+      )
+
+      // Create Selection Queries from Structure Expressions
+      const binderSelectionQuery = StructureSelectionQuery(
+        binderTag,
+        binderExpression
+      )
+      const targetProteinSelectionQuery = StructureSelectionQuery(
+        targetTag,
+        targetProteinExpression
+      )
+      console.log("Binder Selection Query: ", binderSelectionQuery)
+      console.log("Target Selection Query:", targetProteinSelectionQuery)
+
+      const components = {
+        ligand: await presetStaticComponent(plugin, structureCell, "all"),
+        targetTag:
+          await plugin.builders.structure.tryCreateComponentFromSelection(
+            structureCell,
+            targetProteinSelectionQuery,
+            "selection-".concat(targetTag),
+            params
+          ),
+        binderTag:
+          await plugin.builders.structure.tryCreateComponentFromSelection(
+            structureCell,
+            binderSelectionQuery,
+            "selection-".concat(binderTag),
+            params
+          ),
+      }
+
+      const { update, builder, typeParams } =
+        StructureRepresentationPresetProvider.reprBuilder(plugin, params)
+      const representations = {
+        targetTag: builder.buildRepresentation(
+          update,
+          components.targetTag,
+          DefaultSurfaceParams
+        ),
+        binderTag: builder.buildRepresentation(
+          update,
+          components.binderTag,
+          BinderCartoonParams
+        ),
+      }
+
+      await update.commit({ revertOnError: true })
+      plugin.managers.interactivity.setProps({ granularity: "element" })
+      return { components, representations }
+    },
+  }
+)
 
 const Molstar = (props) => {
   const {
@@ -291,64 +397,102 @@ const Molstar = (props) => {
     trajFile,
     height = "100%",
     width = "100%",
-    showAxes = true,
+    showAxes = false,
     defaultShowControls = false,
-    showExpand = true,
-    showControls = true,
-    showSettings = true,
-    showSelectionMode = true,
+    showExpand = false,
+    showControls = false,
+    showSettings = false,
+    showSelectionMode = false,
     showAnimation = false,
-    showTrajectoryControls = true,
+    showTrajectoryControls = false,
     preset_id = "",
     flag = false,
+
+    molscriptSelectionResidues = [],
+    molscriptSelectionChains = "",
   } = props
   const parentRef = useRef(null)
   const canvasRef = useRef(null)
   const plugin = useRef(null)
 
   const [initialized, setInitialized] = useState(false)
+  const [defaultCameraSnapshot, setDefaultCameraSnapshot] = useState(null)
 
-  const MySpec = {
-    ...DefaultPluginUISpec(),
-    config: [
-      [PluginConfig.Viewport.ShowExpand, showExpand],
-      [PluginConfig.Viewport.ShowControls, showControls],
-      [PluginConfig.Viewport.ShowSettings, showSettings],
-      [PluginConfig.Viewport.ShowSelectionMode, showSelectionMode],
-      [PluginConfig.Viewport.ShowAnimation, true],
-      [PluginConfig.Structure.DefaultRepresentationPreset, preset_id],
-      [PluginConfig.Viewport.ShowTrajectoryControls, showTrajectoryControls],
-    ],
-    layout: {
-      initial: {
-        isExpanded: false,
-        controlsDisplay: "reactive",
-        showControls: defaultShowControls,
-      },
-    },
-  }
   function get_spec() {
     const spec = DefaultPluginUISpec()
     spec.layout = {
       initial: {
-        isExpanded: false,
-        controlsDisplay: "reactive",
+        isExpanded: true,
+        controlsDisplay: "outside",
         showControls: defaultShowControls,
       },
     }
-    const preset = flag ? ViewerAutoPreset.id : ViewerAutoPreset.id //InteractionsPreset.id
+    const preset = DefaultGaussianRepresentationPreset.id
     spec.config = [
       [PluginConfig.Viewport.ShowExpand, showExpand],
       [PluginConfig.Viewport.ShowControls, showControls],
       [PluginConfig.Viewport.ShowSettings, showSettings],
       [PluginConfig.Viewport.ShowSelectionMode, showSelectionMode],
-      [PluginConfig.Viewport.ShowAnimation, true],
-      [
-        PluginConfig.Structure.DefaultRepresentationPreset,
-        InteractionsPreset.id,
-      ],
+      [PluginConfig.Viewport.ShowAnimation, !showAnimation],
+      [PluginConfig.Structure.DefaultRepresentationPreset, preset_id],
       [PluginConfig.Viewport.ShowTrajectoryControls, showTrajectoryControls],
     ]
+
+    spec.canvas3d = {
+      sceneRadiusFactor: 100,
+      cameraResetDurationMs: 100,
+      camera: {
+        helper: {
+          axes: {
+            name: "off",
+            params: {},
+          },
+        },
+      },
+      // viewport: {
+      //   name: "canvas",
+      //   params: {
+      //     x: 0,
+      //     y: 0,
+      //     width: 100,
+      //     height: 200,
+      //   },
+      // },
+      marking: {
+        selectEdgeColor: ColorNames.orange,
+        selectEdgeStrength: 10,
+      },
+      renderer: {
+        backgroundColor: ColorNames.white,
+        selectColor: hotspotColor,
+        xrayEdgeFalloff: 10,
+        selectStrength: 0,
+      },
+      postprocessing: {
+        outline: {
+          name: "on",
+          params: {
+            scale: 3,
+            threshold: 0.5,
+            color: secondaryColor,
+            includeTransparent: true,
+          },
+        },
+      },
+      trackball: {
+        noScroll: false,
+        rotateSpeed: 2,
+        zoomSpeed: 0.2,
+        panSpeed: 0.8,
+        spin: true,
+        spinSpeed: 1,
+        staticMoving: false,
+        dynamicDampingFactor: 0.06,
+        minDistance: 0.01,
+        maxDistance: 1e150,
+      },
+    }
+
     if (modelFile?.format === "gro" || trajFile?.format === "gro") {
       spec.behaviors = spec.behaviors.filter(
         (behavior) =>
@@ -360,41 +504,107 @@ const Molstar = (props) => {
   }
 
   function getSelectionFromChainAuthId(chainId, positions) {
-    // const chainTestQuery = MS.core.rel.eq([
-    //   MS.struct.atomProperty.macromolecular.label_asym_id(),
-    //   chainId,
-    // ])
-    // const residueTestQuery = positions
-    //   ? MS.core.set.has([
-    //       MS.set(...positions),
-    //       MS.struct.atomProperty.macromolecular.auth_seq_id(),
-    //     ])
-    //   : undefined
+    // console.log("hiifdsajfk")
+    if (!plugin.current.managers.structure.hierarchy.current.structures[0]) {
+      console.log(!plugin.current.managers.structure.hierarchy.current)
+      return
+    }
 
-    const query = MS.struct.generator.atomGroups({
-      "chain-test": MS.core.rel.eq([
-        MS.struct.atomProperty.macromolecular.label_asym_id(),
-        chainId,
-      ]),
-      // "residue-test": MS.core.set.has([
-      //   MS.set(...positions),
-      //   MS.struct.atomProperty.macromolecular.auth_seq_id(),
-      // ]),
-      "group-by": MS.struct.atomProperty.macromolecular.residueKey(),
-    })
-    return Script.getStructureSelection(
-      query,
-      plugin.current.managers.structure.hierarchy.current.structures[0].cell.obj
-        ?.data
+    const query = getSelectionQueryFromMolscript(chainId, positions)
+
+    return getSubstructure(
+      plugin.current.managers.structure.hierarchy.current.structures[0].cell,
+      query
     )
   }
 
-  async function get_current() {
-    if (plugin && plugin.current) {
-      const current = await plugin.current.managers.structure.hierarchy.current
-      return current
+  async function updateRepresentation() {
+    if (!plugin || !plugin.current) {
+      return
     }
-    return
+    console.log("Update triggered by preset_id: ", preset_id)
+    const a = new StructureComponentManager(plugin.current)
+    if (preset_id === DefaultGaussianRepresentationPreset.id) {
+      await a.applyPreset(
+        plugin.current.managers.structure.hierarchy.selection.structures,
+        DefaultGaussianRepresentationPreset
+      )
+    } else if (preset_id === DefaultHotspotRepresentationPreset.id) {
+      await a.applyPreset(
+        plugin.current.managers.structure.hierarchy.selection.structures,
+        DefaultHotspotRepresentationPreset
+      )
+    } else if (preset_id === DefaultBinderRepresentationPreset.id) {
+      await a.applyPreset(
+        plugin.current.managers.structure.hierarchy.selection.structures,
+        DefaultBinderRepresentationPreset
+      )
+    }
+  }
+
+  async function updateSelection() {
+    if (!plugin || !plugin.current) {
+      return
+    }
+    plugin.current.managers.interactivity.lociSelects.deselectAll()
+
+    console.log("yooo")
+    const selection = getSelectionFromChainAuthId(
+      molscriptSelectionChains,
+      molscriptSelectionResidues
+    )
+    console.log(selection)
+
+    if (
+      selection === null ||
+      selection === undefined ||
+      selection.kind === "singletons"
+    ) {
+      console.log("resetting camera")
+      // plugin.current.managers.camera.resetAxes(500)
+      // plugin.current.managers.camera.setSnapshot(defaultCameraSnapshot)
+      await setDefaultCamera()
+      return
+    }
+
+    const loci = StructureSelection.toLociWithSourceUnits(selection)
+
+    plugin.current.managers.interactivity.lociSelects.select({
+      loci: loci,
+    })
+    plugin.current.managers.camera.focusLoci(loci, {
+      // minRadius: 1,
+      // durationMs: 250,
+      extraRadius: 30,
+    })
+  }
+
+  async function setDefaultCamera() {
+    if (!plugin || !plugin.current) {
+      return
+    }
+
+    if (defaultCameraSnapshot === null) {
+      console.log('setting default camera')
+      plugin.current.managers.camera.resetAxes()
+      const rotMatrix = rotateBy([
+        rotateZ(-90),
+        rotateY(125),
+        rotateX(0),
+        rotateZ(-30),
+      ])
+      const snapshot = changeCameraRotation(
+        plugin.current.canvas3d.camera.getSnapshot(),
+        rotMatrix
+      )
+      // console.log(defaultCameraSnapshot)
+      setDefaultCameraSnapshot(snapshot)
+      // console.log(snapshot)
+      // console.log(defaultCameraSnapshot)
+    }
+
+    console.log(defaultCameraSnapshot)
+    await plugin.current.managers.camera.setSnapshot(defaultCameraSnapshot)
   }
 
   useEffect(() => {
@@ -406,149 +616,90 @@ const Molstar = (props) => {
           // the preset needs to be added before the UI renders otherwise
           // "Download Structure" wont be able to pick it up
           plugin.builders.structure.representation.registerPreset(
-            ViewerAutoPreset
+            DefaultGaussianRepresentationPreset
+          )
+
+          plugin.builders.structure.representation.registerPreset(
+            DefaultHotspotRepresentationPreset
           )
           plugin.builders.structure.representation.registerPreset(
-            InteractionsPreset
+            DefaultBinderRepresentationPreset
           )
-          plugin.builders.structure.representation.registerPreset(HotspotPreset)
         },
       })
-      if (true) {
-        // eslint-disable-next-line
-        await plugin.current.canvas3d?.setProps({
-          // color: ColorNames.red,
-          camera: {
-            helper: {
-              axes: {
-                name: "off",
-                params: {},
-              },
-            },
-          },
-          backgroundColor: ColorNames.pink, // or: 0xff0000 as Color
-        })
-      }
       await loadStructure(modelFile, trajFile, plugin.current)
+      const sleep = (ms = 0) =>
+        new Promise((resolve) => setTimeout(resolve, ms))
+
+      await sleep(10)
+      if (!plugin.current.canvas3d) return
+
+      await updateRepresentation()
+      await updateSelection()
+      await setDefaultCamera()
     }
     init()
-    const disposePlugin = () => {
-      if (plugin.current) {
-        plugin.current.dispose()
-        plugin.current = null
-      }
-    }
-    // return disposePlugin
   }, [])
 
   useEffect(() => {
     async function update() {
-      if (!plugin || !plugin.current) {
-        return
-      }
-      console.log("update!")
-
-      // const curr = await get_current()
-      const hierarchy = await plugin.current.managers.structure.hierarchy
-        .current //
-      const refs = hierarchy.refs
-      const structures = await plugin.current.managers.structure.component
-        .currentStructures
-      const components = structures[0].components
-      const component = components[0]
-      // const structures = hierarchy.structures
-      const a = new StructureComponentManager(plugin.current)
-      console.log(hierarchy)
-      console.log(structures)
-
-      await a.applyPreset(
-        plugin.current.managers.structure.hierarchy.selection.structures,
-        HotspotPreset
-      )
-
-      const selection = getSelectionFromChainAuthId(
-        "C"
-        // [306, 307, 308, 309, 310, 311]
-      )
-      const loci = StructureSelection.toLociWithSourceUnits(selection)
-      console.log("dsakjflaksdj")
-      console.log(loci)
-
-      plugin.current.managers.interactivity.lociSelects.select({
-        loci: loci,
-      })
+      await setDefaultCamera()
     }
+    update()
+  }, [defaultCameraSnapshot])
 
-    async function test() {
-      if (!plugin || !plugin.current) {
-        return
-      }
-      const structures = await plugin.current.managers.structure.component
-        .currentStructures
+  useEffect(() => {
+    async function update() {
+      await updateRepresentation()
+      // await setDefaultCamera()
+    }
+    update()
+  }, [preset_id])
 
-      for (const s of structures) {
-        for (const c of s.components) {
-          for (const repr of c.representations) {
-            console.log(repr)
-            plugin.current
-              .build()
-              .to(repr.cell)
-              .update(
-                createStructureRepresentationParams(plugin.current, repr.cell, {
-                  type: "ball-and-stick",
-                  typeParams: { aromaticBonds: true },
-                })
-              )
-              .commit()
-          }
-        }
-      }
+  useEffect(() => {
+    async function update() {
+      console.log("Update triggered by modelFile.name: ", modelFile.name)
+      await loadStructure(modelFile, trajFile, plugin.current)
+      await updateRepresentation()
+      await updateSelection()
+      // await setDefaultCamera()
+    }
+    update()
+  }, [modelFile.name])
 
-      if (!plugin.current.canvas3d) return
+  useEffect(() => {
+    async function update() {
+      console.log(
+        "Update triggered by selected residues, chains, or modelFile.name:",
+        molscriptSelectionResidues,
+        molscriptSelectionChains,
+        modelFile.name
+      )
+      updateSelection()
+    }
+    update()
+  }, [molscriptSelectionResidues, molscriptSelectionChains, modelFile.name])
+
+  useEffect(() => {
+    async function update() {
+      console.log("Updating triggered by flag: ", flag)
+      if (!plugin || !plugin.current || !plugin.current.canvas3d) return
       const trackball = plugin.current.canvas3d.props.trackball
-      PluginCommands.Canvas3D.SetSettings(plugin.current, {
+      await PluginCommands.Canvas3D.SetSettings(plugin.current, {
         settings: {
-          sceneRadiusFactor: 10,
-          marking: {
-            selectEdgeColor: ColorNames.black,
-            selectEdgeStrength: 10,
-          },
-          renderer: {
-            backgroundColor: ColorNames.white,
-            selectColor: ColorNames.white,
-          },
-
           trackball: {
-            ...trackball,
-            noScroll: false,
-            rotateSpeed: 2,
-            zoomSpeed: 0.2,
-            panSpeed: 0.8,
-            spin: true,
-            spinSpeed: 1,
-            staticMoving: false,
-            dynamicDampingFactor: 0.06,
-            minDistance: 0.01,
-            maxDistance: 1e150,
-            // gestureScaleFactor: 0.01,
-
-            //   animate:
-            //     trackball.animate.name === "spin"
-            //       ? { name: "off", params: {} }
-            //       : { name: "spin", params: { speed: 5 } },
+            animate: flag
+              ? { name: "spin", params: { speed: 1 } }
+              : { name: "off", params: { speed: 0 } },
           },
         },
       })
     }
-
-    if (flag) {
-      update()
-    } else {
-      test()
-    }
+    update()
   }, [flag])
 
   const loadStructure = async (modelFile, trajFile, _plugin) => {
+    console.log("hiiiii load struct")
     if (_plugin) {
       console.log("Loading structure...")
       _plugin.clear()
@@ -599,13 +750,36 @@ const Molstar = (props) => {
           })
         )
       }
+
+      // _plugin.managers.camera.resetAxes()
+      // // _plugin.canvas3d.camera.resetAxes()
+      // const snapshot = changeCameraRotation(
+      //   _plugin.canvas3d.camera.getSnapshot(),
+      //   ROTATION_MATRICES.rotY90
+      // )
+      // _plugin.managers.camera.setSnapshot(snapshot)
     }
   }
   return (
-    <div style={{ position: "absolute", width, height, overflow: "hidden" }}>
+    <div
+      style={{
+        position: "absolute",
+        width,
+        height,
+        overflow: "hidden",
+        border: "0px",
+      }}
+    >
       <div
         ref={parentRef}
-        style={{ position: "absolute", left: 0, top: 0, right: 0, bottom: 0 }}
+        style={{
+          position: "absolute",
+          left: 0,
+          top: 0,
+          right: 0,
+          bottom: 0,
+          border: "0px",
+        }}
       />
     </div>
   )
@@ -631,6 +805,9 @@ Molstar.propTypes = {
 
   preset_id: PropTypes.string,
   flag: PropTypes.bool,
+
+  molscriptSelectionResidues: PropTypes.array,
+  molscriptSelectionChains: PropTypes.string,
 }
 
 export default Molstar

@@ -94,7 +94,9 @@ def st_molstar_content(
     width="240px",
     key=None,
     preset_id='preset-structure-representation-viewer-auto',
-    flag='false'
+    flag='false',
+    molscriptSelectionResidues=None,
+    molscriptSelectionChains=None,
 ):
     params = {
         "test": "xsomething!",
@@ -109,6 +111,8 @@ def st_molstar_content(
         },
         "modelFile_data": file_content,
         "preset_id": preset_id,
+        "molscriptSelectionResidues": molscriptSelectionResidues,
+        "molscriptSelectionChains": molscriptSelectionChains,
     }
     # print(params)
     if traj_file_content:
